@@ -27,7 +27,7 @@
 }
 
 /* Arrières-plans clairs classiques --> sombres */
-.dark .bg-white {
+.dark .bg-white, .dark .bg-white\/80 {
   @apply !bg-slate-800 !border-slate-700;
 }
 

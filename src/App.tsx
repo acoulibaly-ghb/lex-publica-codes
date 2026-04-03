@@ -784,15 +784,15 @@ function App() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 bg-white overflow-hidden">
         {/* Header */}
-        <header className="h-16 border-b border-gray-100 flex items-center justify-between px-6 bg-white/80 backdrop-blur-md sticky top-0 z-10">
+        <header className="h-16 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between px-6 bg-white/80 dark:bg-slate-900/90 backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setShowSidebar(!showSidebar)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-gray-500 dark:text-slate-400"
             >
               <ChevronRight className={cn("transition-transform duration-300", showSidebar && "rotate-180")} />
             </button>
-            <h2 className="text-lg font-semibold text-gray-900 capitalize">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100 capitalize">
               {activeTab === 'chat' ? 'Assistant IA Juridique' : activeTab === 'jurisprudence' ? 'Veille Jurisprudentielle' : activeTab === 'codes' ? 'Mes Codes' : activeTab === 'faq' ? 'Base de Connaissances' : 'Messages Favoris'}
             </h2>
           </div>

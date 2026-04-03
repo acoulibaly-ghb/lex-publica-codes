@@ -103,14 +103,14 @@ service cloud.firestore {
     function isValidMessage(data, isUpdate) {
       return hasOnlyAllowedFields(['id', 'userId', 'codeId', 'role', 'content', 'isFavorite', 'sources', 'timestamp']) &&
              data.id is string &&
-             data.userId == request.auth.uid &&
-             data.codeId is string &&
+             (!('userId' in data) || data.userId == request.auth.uid) &&
+             (!('codeId' in data) || data.codeId is string) &&
              data.role in ['user', 'assistant'] &&
              data.content is string && data.content.size() < 1000000 &&
              (!('isFavorite' in data) || data.isFavorite == null || data.isFavorite is bool) &&
              (!('sources' in data) || data.sources == null || data.sources is list) &&
              data.timestamp is timestamp &&
-             (!isUpdate || (data.id == resource.data.id && data.userId == resource.data.userId && data.codeId == resource.data.codeId && data.timestamp == resource.data.timestamp));
+             (!isUpdate || (data.id == resource.data.id && (!('userId' in data) || data.userId == resource.data.userId) && data.timestamp == resource.data.timestamp));
     }
 
     function isValidJurisprudence(data, isUpdate) {

@@ -1,0 +1,89 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "LexAdmin User profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string", "format": "uri" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "LegalCode": {
+      "title": "Legal Code",
+      "description": "A legal code with its associated knowledge base",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "knowledgeBase": { "type": "string" },
+        "link": { "type": "string", "format": "uri" },
+        "isFavorite": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "name"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A chat message in a legal consultation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "codeId": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "assistant"] },
+        "content": { "type": "string" },
+        "isFavorite": { "type": "boolean" },
+        "sources": { "type": "array", "items": { "type": "string" } },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "userId", "codeId", "role", "content", "timestamp"]
+    },
+    "Jurisprudence": {
+      "title": "Jurisprudence",
+      "description": "A legal decision and its analysis",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "summary": { "type": "string" },
+        "impact": { "type": "string", "enum": ["low", "medium", "high"] },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "link": { "type": "string", "format": "uri" },
+        "fullAnalysis": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "title", "date", "summary", "impact", "tags"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data"
+    },
+    "/users/{userId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "User's chat history"
+    },
+    "/users/{userId}/codes/{codeId}": {
+      "schema": "LegalCode",
+      "description": "User's legal codes and their knowledge bases"
+    },
+    "/users/{userId}/jurisprudence/{jurisprudenceId}": {
+      "schema": "Jurisprudence",
+      "description": "User's tracked legal decisions"
+    },
+    "/users/{userId}/faqs/{faqId}": {
+      "schema": "FAQ",
+      "description": "User's custom legal knowledge base entries"
+    }
+  }
+}

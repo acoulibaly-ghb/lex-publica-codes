@@ -92,9 +92,9 @@ service cloud.firestore {
              data.id is string && data.id.size() > 0 &&
              data.userId == request.auth.uid &&
              data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
-             (data.knowledgeBase == null || (data.knowledgeBase is string && data.knowledgeBase.size() < 1000000)) &&
-             (data.link == null || (data.link is string && data.link.size() < 1000)) &&
-             (data.isFavorite == null || data.isFavorite is bool) &&
+             (!('knowledgeBase' in data) || data.knowledgeBase == null || (data.knowledgeBase is string && data.knowledgeBase.size() < 1000000)) &&
+             (!('link' in data) || data.link == null || (data.link is string && data.link.size() < 1000)) &&
+             (!('isFavorite' in data) || data.isFavorite == null || data.isFavorite is bool) &&
              data.createdAt is timestamp &&
              data.updatedAt is timestamp &&
              (!isUpdate || (data.id == resource.data.id && data.userId == resource.data.userId && data.createdAt == resource.data.createdAt));
@@ -107,8 +107,8 @@ service cloud.firestore {
              data.codeId is string &&
              data.role in ['user', 'assistant'] &&
              data.content is string && data.content.size() < 1000000 &&
-             (data.isFavorite == null || data.isFavorite is bool) &&
-             (data.sources == null || data.sources is list) &&
+             (!('isFavorite' in data) || data.isFavorite == null || data.isFavorite is bool) &&
+             (!('sources' in data) || data.sources == null || data.sources is list) &&
              data.timestamp is timestamp &&
              (!isUpdate || (data.id == resource.data.id && data.userId == resource.data.userId && data.codeId == resource.data.codeId && data.timestamp == resource.data.timestamp));
     }
@@ -122,8 +122,8 @@ service cloud.firestore {
              data.summary is string && data.summary.size() < 10000 &&
              data.impact in ['Faible', 'Moyen', 'Fort', 'Critique'] &&
              data.tags is list &&
-             (data.link == null || (data.link is string && data.link.size() < 1000)) &&
-             (data.fullAnalysis == null || (data.fullAnalysis is string && data.fullAnalysis.size() < 1000000)) &&
+             (!('link' in data) || data.link == null || (data.link is string && data.link.size() < 1000)) &&
+             (!('fullAnalysis' in data) || data.fullAnalysis == null || (data.fullAnalysis is string && data.fullAnalysis.size() < 1000000)) &&
              data.createdAt is timestamp &&
              (!isUpdate || (data.id == resource.data.id && data.userId == resource.data.userId && data.createdAt == resource.data.createdAt));
     }

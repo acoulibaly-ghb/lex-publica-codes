@@ -12,3 +12,107 @@
     @apply font-sans antialiased;
   }
 }
+
+/* =========================================================
+   DARK MODE OVERRIDES (La "Cerise sur le gâteau" 🍒)
+   Cela évite de devoir ajouter 'dark:' sur 1700 lignes de React.
+   ========================================================= */
+
+.dark {
+  color-scheme: dark;
+}
+
+.dark body {
+  @apply bg-slate-900 text-slate-100;
+}
+
+/* Arrières-plans clairs classiques --> sombres */
+.dark .bg-white {
+  @apply bg-slate-800 border-slate-700 !important;
+}
+
+.dark .bg-gray-50 {
+  @apply bg-slate-900 border-slate-800 !important;
+}
+
+.dark .bg-gray-100 {
+  @apply bg-slate-800 !important;
+}
+
+.dark .bg-gray-200 {
+  @apply bg-slate-700 !important;
+}
+
+/* Textes */
+.dark .text-gray-900 {
+  @apply text-slate-100 !important;
+}
+
+.dark .text-gray-800 {
+  @apply text-slate-200 !important;
+}
+
+.dark .text-gray-700, .dark .text-gray-600 {
+  @apply text-slate-300 !important;
+}
+
+.dark .text-gray-500, .dark .text-gray-400 {
+  @apply text-slate-400 !important;
+}
+
+/* Bordures & Ombres */
+.dark .border-gray-100, .dark .border-gray-200 {
+  @apply border-slate-700 !important;
+}
+
+.dark .shadow-sm, .dark .shadow-md, .dark .shadow-lg, .dark .shadow-2xl {
+  box-shadow: none !important;
+}
+
+.dark .shadow-emerald-100, .dark .shadow-emerald-200 {
+  box-shadow: none !important;
+}
+
+/* Actions au survol */
+.dark .hover\:bg-gray-50:hover {
+  @apply bg-slate-700 !important;
+}
+
+.dark .hover\:bg-gray-100:hover {
+  @apply bg-slate-700 !important;
+}
+
+/* Ajustements pour la couleur de la marque (Emerald) */
+.dark .text-emerald-600 {
+  @apply text-emerald-400 !important;
+}
+
+.dark .bg-emerald-50 {
+  @apply bg-emerald-900/30 text-emerald-400 !important;
+}
+
+.dark .bg-emerald-100, .dark .bg-emerald-600 {
+  @apply bg-emerald-600 text-white !important;
+}
+
+/* Formulaires */
+.dark input, .dark textarea, .dark select {
+  @apply bg-slate-800 text-white border-slate-600 focus:ring-emerald-500 focus:border-emerald-500 placeholder-slate-400 !important;
+}
+
+/* Contenu Markdown de l'IA */
+.dark .markdown-body {
+  @apply text-slate-300 !important;
+}
+.dark .markdown-body h1, .dark .markdown-body h2, .dark .markdown-body h3, .dark .markdown-body h4 {
+  @apply text-slate-100 !important;
+}
+.dark .markdown-body strong {
+  @apply text-slate-200 !important;
+}
+.dark .markdown-body code {
+  @apply bg-slate-700 text-emerald-300 !important;
+}
+.dark .markdown-body a {
+  @apply text-emerald-400 !important;
+}

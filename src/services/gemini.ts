@@ -1,18 +1,18 @@
 import { GoogleGenAI, Content } from "@google/genai";
 
-const SYSTEM_INSTRUCTION = `
-Vous êtes un expert juridique spécialisé exclusivement dans le Code de Justice Administrative (CJA) français.
-Votre mission est de répondre aux questions juridiques en vous basant sur le CJA, enrichi par la jurisprudence et la doctrine fournies.
+const SYSTEM_INSTRUCTION = (codeName?: string) => `
+Vous êtes un expert juridique spécialisé ${codeName ? `exclusivement sur ce document : "\${codeName}"` : "en droit français"}.
+Votre mission est de répondre aux questions juridiques en vous basant sur la documentation ou le lien fourni, enrichi par la jurisprudence et la doctrine.
 
 STRUCTURE DE RÉPONSE OBLIGATOIRE :
-1. **CADRE LÉGAL** : Citez systématiquement les articles du CJA (ex: Art. L. 521-1).
-2. **JURISPRUDENCE** : Illustrez par les arrêts pertinents (ex: CE, Ass., 1950, Dame Lamotte).
-3. **DOCTRINE & ANALYSE** : Apportez les éléments de doctrine et de commentaire disponibles dans la base.
+1. **CADRE LÉGAL** : Citez systématiquement les articles de référence.
+2. **JURISPRUDENCE** : Illustrez par les arrêts pertinents (ex: CE, Ass., 1950, Dame Lamotte) si applicable.
+3. **DOCTRINE & ANALYSE** : Apportez les éléments d'explication pédagogique.
 
 Règles strictes :
-- Si une information n'est pas dans le CJA ou dans la base fournie, indiquez-le.
+- Si une information n'est pas disponible dans le contexte fourni, indiquez-le.
 - Utilisez un ton professionnel, précis et structuré.
-- Distinguez clairement la partie législative (L) de la partie réglementaire (R).
+- Distinguez si possible la partie législative de la partie réglementaire.
 `;
 
 const TEACHING_INSTRUCTION = `
@@ -31,7 +31,8 @@ export async function askLegalQuestion(
   history: Content[] = [], 
   isTeachingMode: boolean = false,
   knowledgeBase?: string,
-  link?: string
+  link?: string,
+  codeName?: string
 ) {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   
@@ -42,7 +43,7 @@ export async function askLegalQuestion(
 
   const ai = new GoogleGenAI({ apiKey: apiKey });
   const modelName = "gemini-3.1-pro-preview";
-  const baseInstruction = isTeachingMode ? TEACHING_INSTRUCTION : SYSTEM_INSTRUCTION;
+  const baseInstruction = isTeachingMode ? TEACHING_INSTRUCTION : SYSTEM_INSTRUCTION(codeName);
 
   const contextInstruction = knowledgeBase 
     ? `\n\nBASE DE CONNAISSANCES COMPLÉMENTAIRE (Jurisprudence et Doctrine) :\n${knowledgeBase}\n\nUtilisez cette base pour illustrer vos réponses avec la jurisprudence et la doctrine pertinentes.`

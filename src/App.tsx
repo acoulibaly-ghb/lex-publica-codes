@@ -169,6 +169,7 @@ function App() {
   const [codesSearch, setCodesSearch] = useState('');
   const [selectedJurisprudence, setSelectedJurisprudence] = useState<Jurisprudence | null>(null);
   const [selectedCode, setSelectedCode] = useState<LegalCode | null>(null);
+  const [activeChatCodeId, setActiveChatCodeId] = useState<string>('');
   const [showAddJModal, setShowAddJModal] = useState(false);
   const [showAddCodeModal, setShowAddCodeModal] = useState(false);
   const [showAddFAQModal, setShowAddFAQModal] = useState(false);
@@ -342,12 +343,15 @@ function App() {
         parts: [{ text: m.content }]
       }));
 
+      const activeCode = codes.find(c => c.id === activeChatCodeId);
+
       const response = await askLegalQuestion(
         input, 
         history as any, 
         isTeachingMode, 
-        selectedCode?.knowledgeBase,
-        selectedCode?.link
+        activeCode?.knowledgeBase,
+        activeCode?.link,
+        activeCode?.name
       );
 
       const assistantMessage: Message = {
@@ -551,6 +555,12 @@ function App() {
     } catch (error) {
       console.error('Error sending to chat:', error);
     }
+  };
+
+  const handleSendCodeContextToChat = (codeId: string) => {
+    setActiveChatCodeId(codeId);
+    setSelectedCode(null);
+    setActiveTab('chat');
   };
 
   const toggleFavoriteMessage = async (message: Message) => {
@@ -908,6 +918,19 @@ function App() {
 
               {/* Input Area */}
               <div className="p-6 bg-white border-t border-gray-100">
+                <div className="max-w-4xl mx-auto mb-3 flex items-center justify-end gap-2">
+                  <div className="text-xs text-gray-500 font-medium">Source interrogée :</div>
+                  <select
+                    value={activeChatCodeId}
+                    onChange={(e) => setActiveChatCodeId(e.target.value)}
+                    className="text-xs bg-gray-50 border border-gray-200 text-gray-700 rounded-lg px-2 py-1.5 focus:ring-emerald-500 focus:border-emerald-500 max-w-[250px] truncate"
+                  >
+                    <option value="">Aucune (Générale)</option>
+                    {codes.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
                 <form onSubmit={handleSubmit} className="max-w-4xl mx-auto relative">
                   <div className="relative flex items-end gap-2 bg-gray-50 border border-gray-200 rounded-2xl p-2 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all shadow-sm">
                     <button
@@ -1536,16 +1559,16 @@ function App() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => copyToClipboard(selectedCode.knowledgeBase, selectedCode.id)}
+                    onClick={() => copyToClipboard(selectedCode.knowledgeBase || selectedCode.link || selectedCode.name, selectedCode.id)}
                     className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                     title="Copier le contenu"
                   >
                     {isCopying === selectedCode.id ? <Check size={20} /> : <Copy size={20} />}
                   </button>
                   <button
-                    onClick={() => handleSendToChat(selectedCode.knowledgeBase)}
+                    onClick={() => handleSendCodeContextToChat(selectedCode.id)}
                     className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                    title="Envoyer vers le chat"
+                    title="Interroger dans le chat"
                   >
                     <MessageSquare size={20} />
                   </button>
@@ -1556,9 +1579,16 @@ function App() {
               </div>
               
               <div className="flex-1 overflow-y-auto p-8">
-                <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                  {selectedCode.knowledgeBase}
-                </div>
+                {selectedCode.knowledgeBase ? (
+                  <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    {selectedCode.knowledgeBase}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500 italic flex flex-col items-center justify-center p-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-100">
+                    <p className="font-medium text-gray-700 mb-2">Aucune base de connaissances locale.</p>
+                    <p className="text-center">Ce code ne contient que le lien Légifrance. Utilisez l'icône "Bulle" en haut à droite pour l'interroger directement dans le chat.</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

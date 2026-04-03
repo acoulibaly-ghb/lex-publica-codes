@@ -28,41 +28,41 @@
 
 /* Arrières-plans clairs classiques --> sombres */
 .dark .bg-white {
-  @apply bg-slate-800 border-slate-700 !important;
+  @apply !bg-slate-800 !border-slate-700;
 }
 
 .dark .bg-gray-50 {
-  @apply bg-slate-900 border-slate-800 !important;
+  @apply !bg-slate-900 !border-slate-800;
 }
 
 .dark .bg-gray-100 {
-  @apply bg-slate-800 !important;
+  @apply !bg-slate-800;
 }
 
 .dark .bg-gray-200 {
-  @apply bg-slate-700 !important;
+  @apply !bg-slate-700;
 }
 
 /* Textes */
 .dark .text-gray-900 {
-  @apply text-slate-100 !important;
+  @apply !text-slate-100;
 }
 
 .dark .text-gray-800 {
-  @apply text-slate-200 !important;
+  @apply !text-slate-200;
 }
 
 .dark .text-gray-700, .dark .text-gray-600 {
-  @apply text-slate-300 !important;
+  @apply !text-slate-300;
 }
 
 .dark .text-gray-500, .dark .text-gray-400 {
-  @apply text-slate-400 !important;
+  @apply !text-slate-400;
 }
 
 /* Bordures & Ombres */
 .dark .border-gray-100, .dark .border-gray-200 {
-  @apply border-slate-700 !important;
+  @apply !border-slate-700;
 }
 
 .dark .shadow-sm, .dark .shadow-md, .dark .shadow-lg, .dark .shadow-2xl {
@@ -75,44 +75,44 @@
 
 /* Actions au survol */
 .dark .hover\:bg-gray-50:hover {
-  @apply bg-slate-700 !important;
+  @apply !bg-slate-700;
 }
 
 .dark .hover\:bg-gray-100:hover {
-  @apply bg-slate-700 !important;
+  @apply !bg-slate-700;
 }
 
 /* Ajustements pour la couleur de la marque (Emerald) */
 .dark .text-emerald-600 {
-  @apply text-emerald-400 !important;
+  @apply !text-emerald-400;
 }
 
 .dark .bg-emerald-50 {
-  @apply bg-emerald-900/30 text-emerald-400 !important;
+  @apply !bg-emerald-900/30 !text-emerald-400;
 }
 
 .dark .bg-emerald-100, .dark .bg-emerald-600 {
-  @apply bg-emerald-600 text-white !important;
+  @apply !bg-emerald-600 !text-white;
 }
 
 /* Formulaires */
 .dark input, .dark textarea, .dark select {
-  @apply bg-slate-800 text-white border-slate-600 focus:ring-emerald-500 focus:border-emerald-500 placeholder-slate-400 !important;
+  @apply !bg-slate-800 !text-white !border-slate-600 focus:!ring-emerald-500 focus:!border-emerald-500 !placeholder-slate-400;
 }
 
 /* Contenu Markdown de l'IA */
 .dark .markdown-body {
-  @apply text-slate-300 !important;
+  @apply !text-slate-300;
 }
 .dark .markdown-body h1, .dark .markdown-body h2, .dark .markdown-body h3, .dark .markdown-body h4 {
-  @apply text-slate-100 !important;
+  @apply !text-slate-100;
 }
 .dark .markdown-body strong {
-  @apply text-slate-200 !important;
+  @apply !text-slate-200;
 }
 .dark .markdown-body code {
-  @apply bg-slate-700 text-emerald-300 !important;
+  @apply !bg-slate-700 !text-emerald-300;
 }
 .dark .markdown-body a {
-  @apply text-emerald-400 !important;
+  @apply !text-emerald-400;
 }

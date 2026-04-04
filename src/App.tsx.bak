@@ -518,19 +518,19 @@ function App() {
       
       # FICHE D'ARRÊT PÉDAGOGIQUE
       
-      ## 1. Faits et procédure
+      ## 1. Faits et Procédure
       (Explique clairement les faits à l'origine du litige et le parcours judiciaire de l'affaire)
       
-      ## 2. Conclusions et moyens des parties
+      ## 2. Prétentions des Parties
       (Détaille les arguments de chaque partie)
       
-      ## 3. Question de droit
+      ## 3. Question de Droit
       (Formule la problématique juridique centrale de manière claire et concise)
       
-      ## 4. Solution de la juridiction
+      ## 4. Solution de la Cour
       (Explique la décision rendue et le raisonnement juridique suivi)
       
-      ## 5. Portée et analyse pédagogique
+      ## 5. Portée et Analyse Pédagogique
       (Analyse l'impact de cette décision sur le droit positif, son importance pour les étudiants et les points clés à retenir)
       
       Utilise un ton professionnel, didactique et précis. Utilise le format Markdown pour la structure.`;

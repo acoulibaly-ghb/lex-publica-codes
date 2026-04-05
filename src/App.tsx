@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, Component, ErrorInfo, ReactNode } from 'react';
-import { Scale, Search, BookOpen, Info, Send, Loader2, Scale as ScaleIcon, ChevronRight, ExternalLink, Sun, Moon, Trash2, Plus, LogOut, LogIn, Star, FileText, Download, Upload, Gavel, Calendar, Tag, AlertCircle, Copy, Check, MessageSquare, Link } from 'lucide-react';
+import { Scale, Search, BookOpen, Info, Send, Loader2, Scale as ScaleIcon, ChevronRight, ExternalLink, Sun, Moon, Trash2, Plus, LogOut, LogIn, Star, FileText, Download, Upload, Gavel, Calendar, Tag, AlertCircle, Copy, Check, MessageSquare, Link, Pencil, ChevronDown, ChevronUp, Bold, Italic, List, Heading1, Heading2, Code } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { askLegalQuestion } from './services/gemini';
 import { clsx, type ClassValue } from 'clsx';
@@ -155,6 +155,76 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
+// ─── Barre d'outils Markdown ────────────────────────────────────────────────
+interface MarkdownToolbarProps {
+  textareaRef: React.RefObject<HTMLTextAreaElement>;
+  value: string;
+  onChange: (val: string) => void;
+}
+
+function MarkdownToolbar({ textareaRef, value, onChange }: MarkdownToolbarProps) {
+  const insert = (before: string, after: string = '') => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const selected = value.substring(start, end);
+    const newVal = value.substring(0, start) + before + selected + after + value.substring(end);
+    onChange(newVal);
+    setTimeout(() => {
+      ta.focus();
+      ta.setSelectionRange(start + before.length, start + before.length + selected.length);
+    }, 0);
+  };
+
+  const insertLine = (prefix: string) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+    const newVal = value.substring(0, lineStart) + prefix + value.substring(lineStart);
+    onChange(newVal);
+    setTimeout(() => {
+      ta.focus();
+      ta.setSelectionRange(start + prefix.length, start + prefix.length);
+    }, 0);
+  };
+
+  const tools = [
+    { label: 'G', title: 'Gras', action: () => insert('**', '**'), style: 'font-bold' },
+    { label: 'I', title: 'Italique', action: () => insert('*', '*'), style: 'italic' },
+    { label: 'H1', title: 'Titre 1', action: () => insertLine('# '), style: 'text-xs font-bold' },
+    { label: 'H2', title: 'Titre 2', action: () => insertLine('## '), style: 'text-xs font-bold' },
+    { label: 'H3', title: 'Titre 3', action: () => insertLine('### '), style: 'text-xs font-bold' },
+    { label: '—', title: 'Séparateur', action: () => insert('\n\n---\n\n'), style: '' },
+    { label: '•', title: 'Liste à puces', action: () => insertLine('- '), style: 'text-base' },
+    { label: '1.', title: 'Liste numérotée', action: () => insertLine('1. '), style: 'text-xs font-bold' },
+    { label: '`', title: 'Code inline', action: () => insert('`', '`'), style: 'font-mono text-xs' },
+  ];
+
+  return (
+    <div className="flex flex-wrap gap-1 px-2 py-1.5 bg-gray-100 border border-b-0 border-gray-200 rounded-t-xl">
+      {tools.map((t) => (
+        <button
+          key={t.title}
+          type="button"
+          title={t.title}
+          onClick={t.action}
+          className={cn(
+            "px-2 py-1 rounded text-gray-600 hover:bg-white hover:text-emerald-700 hover:shadow-sm transition-all text-sm min-w-[28px]",
+            t.style
+          )}
+        >
+          {t.label}
+        </button>
+      ))}
+      <span className="ml-auto text-[10px] text-gray-400 self-center pr-1">Markdown</span>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -169,6 +239,10 @@ function App() {
   const [codesSearch, setCodesSearch] = useState('');
   const [selectedJurisprudence, setSelectedJurisprudence] = useState<Jurisprudence | null>(null);
   const [selectedCode, setSelectedCode] = useState<LegalCode | null>(null);
+  const [selectedFAQ, setSelectedFAQ] = useState<FAQ | null>(null);
+  const [editingFAQ, setEditingFAQ] = useState<FAQ | null>(null);
+  const [editingJurisprudence, setEditingJurisprudence] = useState<Jurisprudence | null>(null);
+  const [collapsedMessages, setCollapsedMessages] = useState<Set<string>>(new Set());
   const [activeChatCodeId, setActiveChatCodeId] = useState<string>('');
   const [showAddJModal, setShowAddJModal] = useState(false);
   const [showAddCodeModal, setShowAddCodeModal] = useState(false);
@@ -199,6 +273,8 @@ function App() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const faqAnswerRef = useRef<HTMLTextAreaElement>(null);
+  const jSummaryRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -226,7 +302,6 @@ function App() {
 
   useEffect(() => {
     if (!user) return;
-
     const q = query(collection(db, `users/${user.uid}/messages`), orderBy('timestamp', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const msgs = snapshot.docs.map(doc => ({
@@ -238,13 +313,11 @@ function App() {
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, `users/${user.uid}/messages`);
     });
-
     return () => unsubscribe();
   }, [user]);
 
   useEffect(() => {
     if (!user) return;
-
     const q = query(collection(db, `users/${user.uid}/jurisprudence`), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
@@ -255,13 +328,11 @@ function App() {
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, `users/${user.uid}/jurisprudence`);
     });
-
     return () => unsubscribe();
   }, [user]);
 
   useEffect(() => {
     if (!user) return;
-
     const q = query(collection(db, `users/${user.uid}/codes`), orderBy('updatedAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
@@ -272,13 +343,11 @@ function App() {
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, `users/${user.uid}/codes`);
     });
-
     return () => unsubscribe();
   }, [user]);
 
   useEffect(() => {
     if (!user) return;
-
     const q = query(collection(db, `users/${user.uid}/faqs`), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
@@ -289,7 +358,6 @@ function App() {
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, `users/${user.uid}/faqs`);
     });
-
     return () => unsubscribe();
   }, [user]);
 
@@ -313,7 +381,6 @@ function App() {
       path
     };
     console.error('Firestore Error: ', JSON.stringify(errInfo));
-    // We don't throw here to avoid crashing the app, but we log it
   };
 
   const copyToClipboard = async (text: string, id: string) => {
@@ -326,7 +393,81 @@ function App() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // ─── NOUVEAU : replier/déplier un message ─────────────────────────────────
+  const toggleMessageCollapse = (id: string) => {
+    setCollapsedMessages(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // ─── NOUVEAU : ouvrir le modal FAQ en mode édition ────────────────────────
+  const openEditFAQ = (faq: FAQ) => {
+    setEditingFAQ(faq);
+    setNewFAQ({ question: faq.question, answer: faq.answer, category: faq.category });
+    setShowAddFAQModal(true);
+  };
+
+  // ─── NOUVEAU : fermer le modal FAQ et réinitialiser ───────────────────────
+  const closeAddFAQModal = () => {
+    setShowAddFAQModal(false);
+    setEditingFAQ(null);
+    setNewFAQ({ question: '', answer: '', category: 'Droit Civil' });
+  };
+
+  // ─── NOUVEAU : ouvrir le modal jurisprudence en mode édition ─────────────
+  const openEditJurisprudence = (j: Jurisprudence) => {
+    setEditingJurisprudence(j);
+    setNewJ({
+      title: j.title,
+      date: j.date,
+      summary: j.summary,
+      impact: j.impact,
+      tags: j.tags,
+      link: j.link,
+    });
+    setShowAddJModal(true);
+  };
+
+  // ─── NOUVEAU : fermer le modal jurisprudence et réinitialiser ─────────────
+  const closeAddJModal = () => {
+    setShowAddJModal(false);
+    setEditingJurisprudence(null);
+    setNewJ({ title: '', date: '', summary: '', impact: 'Moyen', tags: [], link: '' });
+  };
+
+  // ─── NOUVEAU : sauvegarder les modifications d'une décision ──────────────
+  const handleEditJurisprudence = async () => {
+    if (!user || !editingJurisprudence) return;
+    try {
+      await updateDoc(doc(db, `users/${user.uid}/jurisprudence`, editingJurisprudence.id), {
+        title: newJ.title || '',
+        date: newJ.date || '',
+        summary: newJ.summary || '',
+        impact: newJ.impact || 'Moyen',
+        tags: newJ.tags || [],
+        link: newJ.link || '',
+      });
+      if (selectedJurisprudence?.id === editingJurisprudence.id) {
+        setSelectedJurisprudence({
+          ...selectedJurisprudence,
+          title: newJ.title || '',
+          date: newJ.date || '',
+          summary: newJ.summary || '',
+          impact: (newJ.impact as any) || 'Moyen',
+          tags: newJ.tags || [],
+          link: newJ.link || '',
+        });
+      }
+      closeAddJModal();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/jurisprudence`);
+    }
+  };
+
+
     e.preventDefault();
     if (!input.trim() || !user || isLoading) return;
 
@@ -389,7 +530,6 @@ function App() {
 
   const handleAddJurisprudence = async () => {
     if (!user || !newJ.title || !newJ.date) return;
-
     try {
       const jRef = doc(collection(db, `users/${user.uid}/jurisprudence`));
       const jData: Jurisprudence = {
@@ -403,17 +543,8 @@ function App() {
         link: newJ.link || '',
         createdAt: serverTimestamp()
       };
-
       await setDoc(jRef, jData);
-      setShowAddJModal(false);
-      setNewJ({
-        title: '',
-        date: '',
-        summary: '',
-        impact: 'Moyen',
-        tags: [],
-        link: ''
-      });
+      closeAddJModal();
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}/jurisprudence`);
     }
@@ -421,7 +552,6 @@ function App() {
 
   const handleAddCode = async () => {
     if (!user || !newCode.name) return;
-
     try {
       const codeRef = doc(collection(db, `users/${user.uid}/codes`));
       const codeData: LegalCode = {
@@ -433,14 +563,9 @@ function App() {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
-
       await setDoc(codeRef, codeData);
       setShowAddCodeModal(false);
-      setNewCode({
-        name: '',
-        knowledgeBase: '',
-        link: ''
-      });
+      setNewCode({ name: '', knowledgeBase: '', link: '' });
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}/codes`);
     }
@@ -468,7 +593,6 @@ function App() {
 
   const handleAddFAQ = async () => {
     if (!user || !newFAQ.question || !newFAQ.answer) return;
-
     try {
       const faqRef = doc(collection(db, `users/${user.uid}/faqs`));
       const faqData: FAQ = {
@@ -479,16 +603,29 @@ function App() {
         category: newFAQ.category || 'Droit Civil',
         createdAt: serverTimestamp()
       };
-
       await setDoc(faqRef, faqData);
-      setShowAddFAQModal(false);
-      setNewFAQ({
-        question: '',
-        answer: '',
-        category: 'Droit Civil'
-      });
+      closeAddFAQModal();
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}/faqs`);
+    }
+  };
+
+  // ─── NOUVEAU : sauvegarder les modifications d'une fiche ──────────────────
+  const handleEditFAQ = async () => {
+    if (!user || !editingFAQ || !newFAQ.question || !newFAQ.answer) return;
+    try {
+      await updateDoc(doc(db, `users/${user.uid}/faqs`, editingFAQ.id), {
+        question: newFAQ.question!,
+        answer: newFAQ.answer!,
+        category: newFAQ.category || 'Droit Civil',
+      });
+      // Si la lightbox était ouverte sur cette fiche, la mettre à jour
+      if (selectedFAQ?.id === editingFAQ.id) {
+        setSelectedFAQ({ ...selectedFAQ, question: newFAQ.question!, answer: newFAQ.answer!, category: newFAQ.category || 'Droit Civil' });
+      }
+      closeAddFAQModal();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/faqs`);
     }
   };
 
@@ -496,6 +633,7 @@ function App() {
     if (!user) return;
     try {
       await deleteDoc(doc(db, `users/${user.uid}/faqs`, id));
+      if (selectedFAQ?.id === id) setSelectedFAQ(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `users/${user.uid}/faqs`);
     }
@@ -504,7 +642,6 @@ function App() {
   const generateFullAnalysis = async (j: Jurisprudence) => {
     if (!user || isLoading) return;
     setIsLoading(true);
-
     try {
       const prompt = `En tant qu'expert juridique et pédagogue, génère une analyse complète et structurée de la jurisprudence suivante :
       
@@ -536,11 +673,9 @@ function App() {
       Utilise un ton professionnel, didactique et précis. Utilise le format Markdown pour la structure.`;
 
       const response = await askLegalQuestion(prompt, [], true);
-      
       await updateDoc(doc(db, `users/${user.uid}/jurisprudence`, j.id), {
         fullAnalysis: response.text
       });
-      
       setSelectedJurisprudence({ ...j, fullAnalysis: response.text });
     } catch (error) {
       console.error('Error generating analysis:', error);
@@ -590,18 +725,14 @@ function App() {
     
     doc.setFontSize(16);
     doc.text('LexAdmin - Export de Message', margin, 20);
-    
     doc.setFontSize(10);
     doc.text(`Date: ${message.timestamp.toLocaleString()}`, margin, 30);
     doc.text(`Rôle: ${message.role === 'user' ? 'Utilisateur' : 'Assistant LexAdmin'}`, margin, 35);
-    
     doc.setLineWidth(0.5);
     doc.line(margin, 40, pageWidth - margin, 40);
-    
     doc.setFontSize(12);
     const splitText = doc.splitTextToSize(message.content, contentWidth);
     doc.text(splitText, margin, 50);
-    
     doc.save(`lexadmin-message-${message.id}.pdf`);
   };
 
@@ -682,7 +813,6 @@ function App() {
             onClick={signInWithGoogle}
             className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 font-medium shadow-sm"
           >
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/pjax_loader.gif" alt="" className="w-5 h-5 hidden" />
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -826,9 +956,11 @@ function App() {
         </header>
 
         <div className="flex-1 overflow-hidden relative flex flex-col">
+
+          {/* ── CHAT ─────────────────────────────────────────────────────────── */}
           {activeTab === 'chat' && (
             <>
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
                 {messages.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center max-w-lg mx-auto">
                     <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mb-6">
@@ -856,75 +988,107 @@ function App() {
                     </div>
                   </div>
                 ) : (
-                  messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={cn(
-                        "flex gap-4 max-w-4xl",
-                        message.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-1 shadow-sm",
-                        message.role === 'user' ? "bg-emerald-600 text-white" : "bg-white border border-gray-200 text-emerald-600"
-                      )}>
-                        {message.role === 'user' ? <Info size={16} /> : <ScaleIcon size={16} />}
-                      </div>
-                      <div className={cn(
-                        "flex flex-col gap-2",
-                        message.role === 'user' ? "items-end" : "items-start"
-                      )}>
+                  messages.map((message) => {
+                    const isCollapsed = collapsedMessages.has(message.id);
+                    const isAssistant = message.role === 'assistant';
+                    const PREVIEW_LENGTH = 220;
+                    const isLong = message.content.length > PREVIEW_LENGTH;
+
+                    return (
+                      <div
+                        key={message.id}
+                        className={cn(
+                          "flex gap-3 max-w-4xl",
+                          message.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto"
+                        )}
+                      >
                         <div className={cn(
-                          "px-4 py-3 rounded-2xl shadow-sm text-sm leading-relaxed",
-                          message.role === 'user' 
-                            ? "bg-emerald-600 text-white rounded-tr-none" 
-                            : "bg-white border border-gray-100 text-gray-800 rounded-tl-none"
+                          "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-1 shadow-sm",
+                          message.role === 'user' ? "bg-emerald-600 text-white" : "bg-white border border-gray-200 text-emerald-600"
                         )}>
-                          <div className="markdown-body">
-                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                          {message.role === 'user' ? <Info size={16} /> : <ScaleIcon size={16} />}
+                        </div>
+
+                        <div className={cn(
+                          "flex flex-col gap-1.5",
+                          message.role === 'user' ? "items-end" : "items-start"
+                        )}>
+                          {/* Bulle du message */}
+                          <div className={cn(
+                            "px-4 py-3 rounded-2xl shadow-sm text-sm leading-relaxed",
+                            message.role === 'user'
+                              ? "bg-emerald-600 text-white rounded-tr-none"
+                              : "bg-white border border-gray-100 text-gray-800 rounded-tl-none"
+                          )}>
+                            <div className="markdown-body">
+                              {isAssistant && isCollapsed && isLong ? (
+                                <p className="text-gray-500 italic">
+                                  {message.content.substring(0, PREVIEW_LENGTH)}…
+                                </p>
+                              ) : (
+                                <ReactMarkdown>{message.content}</ReactMarkdown>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Actions sous la bulle */}
+                          <div className="flex items-center gap-2 px-1">
+                            <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">
+                              {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+
+                            {/* Bouton replier/déplier — visible sur tous les messages longs */}
+                            {isLong && (
+                              <button
+                                onClick={() => toggleMessageCollapse(message.id)}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-400 hover:text-emerald-600 flex items-center gap-0.5"
+                                title={isCollapsed ? 'Déplier' : 'Replier'}
+                              >
+                                {isCollapsed
+                                  ? <ChevronDown size={14} />
+                                  : <ChevronUp size={14} />
+                                }
+                              </button>
+                            )}
+
+                            {isAssistant && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => copyToClipboard(message.content, message.id)}
+                                  className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-400 hover:text-emerald-600"
+                                  title="Copier"
+                                >
+                                  {isCopying === message.id ? <Check size={14} /> : <Copy size={14} />}
+                                </button>
+                                <button
+                                  onClick={() => toggleFavoriteMessage(message)}
+                                  className={cn(
+                                    "p-1 hover:bg-gray-100 rounded transition-colors",
+                                    message.isFavorite ? "text-yellow-500" : "text-gray-400 hover:text-yellow-500"
+                                  )}
+                                  title="Favoris"
+                                >
+                                  <Star size={14} fill={message.isFavorite ? "currentColor" : "none"} />
+                                </button>
+                                <button
+                                  onClick={() => exportToPDF(message)}
+                                  className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-400 hover:text-emerald-600"
+                                  title="Exporter en PDF"
+                                >
+                                  <FileText size={14} />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 px-1">
-                          <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">
-                            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          {message.role === 'assistant' && (
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => copyToClipboard(message.content, message.id)}
-                                className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-400 hover:text-emerald-600"
-                                title="Copier"
-                              >
-                                {isCopying === message.id ? <Check size={14} /> : <Copy size={14} />}
-                              </button>
-                              <button
-                                onClick={() => toggleFavoriteMessage(message)}
-                                className={cn(
-                                  "p-1 hover:bg-gray-100 rounded transition-colors",
-                                  message.isFavorite ? "text-yellow-500" : "text-gray-400 hover:text-yellow-500"
-                                )}
-                                title="Favoris"
-                              >
-                                <Star size={14} fill={message.isFavorite ? "currentColor" : "none"} />
-                              </button>
-                              <button
-                                onClick={() => exportToPDF(message)}
-                                className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-400 hover:text-emerald-600"
-                                title="Exporter en PDF"
-                              >
-                                <FileText size={14} />
-                              </button>
-                            </div>
-                          )}
-                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Input Area */}
+              {/* Zone de saisie */}
               <div className="p-6 bg-white border-t border-gray-100">
                 <div className="max-w-4xl mx-auto mb-3 flex items-center justify-end gap-2">
                   <div className="text-xs text-gray-500 font-medium">Source interrogée :</div>
@@ -967,8 +1131,8 @@ function App() {
                       disabled={!input.trim() || isLoading}
                       className={cn(
                         "p-2.5 rounded-xl transition-all shadow-md",
-                        !input.trim() || isLoading 
-                          ? "bg-gray-200 text-gray-400 cursor-not-allowed" 
+                        !input.trim() || isLoading
+                          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                           : "bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200"
                       )}
                     >
@@ -990,6 +1154,7 @@ function App() {
             </>
           )}
 
+          {/* ── JURISPRUDENCE ─────────────────────────────────────────────────── */}
           {activeTab === 'jurisprudence' && (
             <div className="flex-1 overflow-y-auto p-6">
               <div className="max-w-5xl mx-auto">
@@ -1020,7 +1185,7 @@ function App() {
 
                 <div className="grid gap-4">
                   {jurisprudence
-                    .filter(j => 
+                    .filter(j =>
                       j.title.toLowerCase().includes(jurisprudenceSearch.toLowerCase()) ||
                       j.summary.toLowerCase().includes(jurisprudenceSearch.toLowerCase()) ||
                       j.tags.some(t => t.toLowerCase().includes(jurisprudenceSearch.toLowerCase()))
@@ -1049,10 +1214,19 @@ function App() {
                           >
                             <Trash2 size={18} />
                           </button>
+                          <button
+                            onClick={() => openEditJurisprudence(j)}
+                            className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                            title="Modifier la décision"
+                          >
+                            <Pencil size={18} />
+                          </button>
                         </div>
-                        
+
                         <div className="relative mb-4">
-                          <p className="text-sm text-gray-600 leading-relaxed pr-8 line-clamp-3">{j.summary}</p>
+                          <div className="text-sm text-gray-600 leading-relaxed pr-8 line-clamp-3 markdown-body">
+                            <ReactMarkdown>{j.summary}</ReactMarkdown>
+                          </div>
                           <button
                             onClick={() => copyToClipboard(j.summary, j.id)}
                             className="absolute right-0 top-0 p-1.5 text-gray-400 hover:text-emerald-600 transition-colors"
@@ -1100,6 +1274,7 @@ function App() {
             </div>
           )}
 
+          {/* ── MES CODES ─────────────────────────────────────────────────────── */}
           {activeTab === 'codes' && (
             <div className="flex-1 overflow-y-auto p-6">
               <div className="max-w-5xl mx-auto">
@@ -1153,7 +1328,7 @@ function App() {
                             <Trash2 size={18} />
                           </button>
                         </div>
-                        
+
                         <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 mb-4">
                           {c.knowledgeBase || "Aucune base de connaissances définie."}
                         </p>
@@ -1174,6 +1349,7 @@ function App() {
             </div>
           )}
 
+          {/* ── BASE DE CONNAISSANCES ─────────────────────────────────────────── */}
           {activeTab === 'faq' && (
             <div className="flex-1 overflow-y-auto p-6">
               <div className="max-w-5xl mx-auto">
@@ -1195,7 +1371,7 @@ function App() {
                   {CATEGORIES.map(category => {
                     const categoryFaqs = faqs.filter(f => f.category === category);
                     if (categoryFaqs.length === 0) return null;
-                    
+
                     return (
                       <div key={category} className="space-y-4">
                         <h4 className="text-sm font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-2">
@@ -1206,14 +1382,29 @@ function App() {
                           {categoryFaqs.map(faq => (
                             <div key={faq.id} className="bg-white border border-gray-100 rounded-2xl p-6 hover:shadow-md transition-all group">
                               <div className="flex justify-between items-start gap-4 mb-4">
-                                <h5 className="text-lg font-bold text-gray-900">{faq.question}</h5>
-                                <div className="flex items-center gap-2">
+                                {/* ← NOUVEAU : titre cliquable pour ouvrir la lightbox */}
+                                <h5
+                                  className="text-lg font-bold text-gray-900 cursor-pointer hover:text-emerald-600 transition-colors"
+                                  title="Voir la fiche complète"
+                                  onClick={() => setSelectedFAQ(faq)}
+                                >
+                                  {faq.question}
+                                </h5>
+                                <div className="flex items-center gap-2 flex-shrink-0">
                                   <button
                                     onClick={() => copyToClipboard(faq.answer, faq.id)}
                                     className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                                     title="Copier la réponse"
                                   >
                                     {isCopying === faq.id ? <Check size={18} /> : <Copy size={18} />}
+                                  </button>
+                                  {/* ← NOUVEAU : bouton d'édition */}
+                                  <button
+                                    onClick={() => openEditFAQ(faq)}
+                                    className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                    title="Modifier la fiche"
+                                  >
+                                    <Pencil size={18} />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteFAQ(faq.id)}
@@ -1224,9 +1415,20 @@ function App() {
                                   </button>
                                 </div>
                               </div>
-                              <div className="text-sm text-gray-600 leading-relaxed markdown-body">
+                              {/* Aperçu formaté */}
+                              <div className="text-sm text-gray-600 leading-relaxed markdown-body line-clamp-4">
                                 <ReactMarkdown>{faq.answer}</ReactMarkdown>
                               </div>
+                              {/* Lien "Voir plus" si le contenu est long */}
+                              {faq.answer.length > 300 && (
+                                <button
+                                  onClick={() => setSelectedFAQ(faq)}
+                                  className="mt-3 text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                                >
+                                  Voir la fiche complète
+                                  <ChevronRight size={14} />
+                                </button>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -1250,6 +1452,7 @@ function App() {
             </div>
           )}
 
+          {/* ── FAVORIS ───────────────────────────────────────────────────────── */}
           {activeTab === 'favorites' && (
             <div className="flex-1 overflow-y-auto p-6">
               <div className="max-w-5xl mx-auto">
@@ -1315,13 +1518,18 @@ function App() {
           )}
         </div>
 
-        {/* Add FAQ Modal */}
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {/* MODAL : Ajouter / Modifier une fiche FAQ                            */}
+        {/* ════════════════════════════════════════════════════════════════════ */}
         {showAddFAQModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
-                <h3 className="text-xl font-bold text-gray-900">Ajouter une fiche</h3>
-                <button onClick={() => setShowAddFAQModal(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                {/* ← NOUVEAU : titre différent selon le mode */}
+                <h3 className="text-xl font-bold text-gray-900">
+                  {editingFAQ ? 'Modifier la fiche' : 'Ajouter une fiche'}
+                </h3>
+                <button onClick={closeAddFAQModal} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                   <Plus size={24} className="rotate-45 text-gray-400" />
                 </button>
               </div>
@@ -1352,41 +1560,116 @@ function App() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Réponse / Contenu</label>
+                  {/* ← NOUVEAU : barre d'outils Markdown */}
+                  <MarkdownToolbar
+                    textareaRef={faqAnswerRef}
+                    value={newFAQ.answer || ''}
+                    onChange={(val) => setNewFAQ({ ...newFAQ, answer: val })}
+                  />
                   <textarea
-                    placeholder="Détaillez la réponse ou le contenu de la fiche..."
+                    ref={faqAnswerRef}
+                    placeholder="Détaillez la réponse ou le contenu de la fiche... (Markdown supporté)"
                     value={newFAQ.answer}
                     onChange={(e) => setNewFAQ({ ...newFAQ, answer: e.target.value })}
-                    rows={8}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 transition-all resize-none"
+                    rows={10}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-b-xl rounded-t-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 transition-all resize-y font-mono text-sm"
                   />
+                  {/* Aperçu en temps réel */}
+                  {newFAQ.answer && (
+                    <div className="mt-2 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Aperçu</p>
+                      <div className="text-sm text-gray-700 leading-relaxed markdown-body">
+                        <ReactMarkdown>{newFAQ.answer}</ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="p-6 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex gap-3">
                 <button
-                  onClick={() => setShowAddFAQModal(false)}
+                  onClick={closeAddFAQModal}
                   className="flex-1 py-3 px-4 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition-all"
                 >
                   Annuler
                 </button>
+                {/* ← NOUVEAU : bouton différent selon le mode */}
                 <button
-                  onClick={handleAddFAQ}
+                  onClick={editingFAQ ? handleEditFAQ : handleAddFAQ}
                   disabled={!newFAQ.question || !newFAQ.answer}
                   className="flex-1 py-3 px-4 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Enregistrer la fiche
+                  {editingFAQ ? 'Enregistrer les modifications' : 'Enregistrer la fiche'}
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Add Jurisprudence Modal */}
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {/* NOUVEAU MODAL : Lightbox d'une fiche FAQ                            */}
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {selectedFAQ && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-gray-100 flex items-start justify-between bg-white sticky top-0 z-10">
+                <div className="flex-1 pr-4">
+                  <span className="inline-block text-[10px] font-bold text-emerald-600 uppercase tracking-wider bg-emerald-50 px-2 py-1 rounded-full mb-2">
+                    {selectedFAQ.category}
+                  </span>
+                  <h3 className="text-xl font-bold text-gray-900">{selectedFAQ.question}</h3>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => copyToClipboard(selectedFAQ.answer, selectedFAQ.id + '-lightbox')}
+                    className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                    title="Copier le contenu"
+                  >
+                    {isCopying === selectedFAQ.id + '-lightbox' ? <Check size={20} /> : <Copy size={20} />}
+                  </button>
+                  <button
+                    onClick={() => { openEditFAQ(selectedFAQ); setSelectedFAQ(null); }}
+                    className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                    title="Modifier la fiche"
+                  >
+                    <Pencil size={20} />
+                  </button>
+                  <button
+                    onClick={() => setSelectedFAQ(null)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors ml-1"
+                    title="Fermer"
+                  >
+                    <Plus size={24} className="rotate-45 text-gray-400" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8">
+                <div className="prose prose-emerald max-w-none text-gray-700 leading-relaxed markdown-body">
+                  <ReactMarkdown>{selectedFAQ.answer}</ReactMarkdown>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+                <button
+                  onClick={() => setSelectedFAQ(null)}
+                  className="px-6 py-2 bg-white border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 transition-all text-sm"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Jurisprudence */}
         {showAddJModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
-                <h3 className="text-xl font-bold text-gray-900">Ajouter une décision</h3>
-                <button onClick={() => setShowAddJModal(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <h3 className="text-xl font-bold text-gray-900">
+                  {editingJurisprudence ? 'Modifier la décision' : 'Ajouter une décision'}
+                </h3>
+                <button onClick={closeAddJModal} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                   <Plus size={24} className="rotate-45 text-gray-400" />
                 </button>
               </div>
@@ -1415,13 +1698,27 @@ function App() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Résumé des faits</label>
+                  <MarkdownToolbar
+                    textareaRef={jSummaryRef}
+                    value={newJ.summary || ''}
+                    onChange={(val) => setNewJ({ ...newJ, summary: val })}
+                  />
                   <textarea
-                    placeholder="Décrivez brièvement les faits et la portée de l'arrêt..."
+                    ref={jSummaryRef}
+                    placeholder="Décrivez les faits et la portée de l'arrêt... (Markdown supporté)"
                     value={newJ.summary}
                     onChange={(e) => setNewJ({ ...newJ, summary: e.target.value })}
-                    rows={4}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 transition-all resize-none"
+                    rows={6}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-b-xl rounded-t-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 transition-all resize-y font-mono text-sm"
                   />
+                  {newJ.summary && (
+                    <div className="mt-1 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Aperçu</p>
+                      <div className="text-sm text-gray-700 leading-relaxed markdown-body">
+                        <ReactMarkdown>{newJ.summary}</ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -1463,24 +1760,24 @@ function App() {
               </div>
               <div className="p-6 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex gap-3">
                 <button
-                  onClick={() => setShowAddJModal(false)}
+                  onClick={closeAddJModal}
                   className="flex-1 py-3 px-4 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition-all"
                 >
                   Annuler
                 </button>
                 <button
-                  onClick={handleAddJurisprudence}
+                  onClick={editingJurisprudence ? handleEditJurisprudence : handleAddJurisprudence}
                   disabled={!newJ.title || !newJ.date}
                   className="flex-1 py-3 px-4 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Enregistrer la décision
+                  {editingJurisprudence ? 'Enregistrer les modifications' : 'Enregistrer la décision'}
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Add Code Modal */}
+        {/* Modal Code */}
         {showAddCodeModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -1543,7 +1840,7 @@ function App() {
           </div>
         )}
 
-        {/* Code Detail Modal */}
+        {/* Modal Code Detail */}
         {selectedCode && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -1585,7 +1882,7 @@ function App() {
                   </button>
                 </div>
               </div>
-              
+
               <div className="flex-1 overflow-y-auto p-8">
                 {selectedCode.knowledgeBase ? (
                   <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
@@ -1602,7 +1899,7 @@ function App() {
           </div>
         )}
 
-        {/* Jurisprudence Detail Modal */}
+        {/* Modal Jurisprudence Detail */}
         {selectedJurisprudence && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -1643,7 +1940,7 @@ function App() {
                   </button>
                 </div>
               </div>
-              
+
               <div className="flex-1 overflow-y-auto p-8">
                 {!selectedJurisprudence.fullAnalysis ? (
                   <div className="text-center py-20">

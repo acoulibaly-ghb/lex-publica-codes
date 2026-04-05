@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, Component, ErrorInfo, ReactNode } from 'react';
-import { Scale, Search, BookOpen, Info, Send, Loader2, Scale as ScaleIcon, ChevronRight, ExternalLink, Sun, Moon, Trash2, Plus, LogOut, LogIn, Star, FileText, Download, Upload, Gavel, Calendar, Tag, AlertCircle, Copy, Check, MessageSquare, Link, Pencil, ChevronDown, ChevronUp, Bold, Italic, List, Heading1, Heading2, Code } from 'lucide-react';
+import { Scale, Search, BookOpen, Info, Send, Loader2, Scale as ScaleIcon, ChevronRight, ExternalLink, Sun, Moon, Trash2, Plus, LogOut, LogIn, Star, FileText, Download, Upload, Gavel, Calendar, Tag, AlertCircle, Copy, Check, MessageSquare, Link, Pencil, ChevronDown, ChevronUp, Bold, Italic, List, Heading1, Heading2, Code, Home, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { askLegalQuestion } from './services/gemini';
 import { clsx, type ClassValue } from 'clsx';
@@ -376,7 +376,9 @@ function App() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isTeachingMode, setIsTeachingMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'jurisprudence' | 'codes' | 'faq' | 'favorites'>('chat');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'jurisprudence' | 'codes' | 'faq' | 'favorites'>('dashboard');
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [favorites, setFavorites] = useState<Message[]>([]);
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [jurisprudence, setJurisprudence] = useState<Jurisprudence[]>([]);
@@ -432,6 +434,19 @@ function App() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Raccourci ⌘K / Ctrl+K pour la recherche globale
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowGlobalSearch(true);
+      }
+      if (e.key === 'Escape') setShowGlobalSearch(false);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // Replier automatiquement tous les longs messages au premier chargement
   useEffect(() => {
@@ -885,22 +900,134 @@ function App() {
   };
 
   const exportToPDF = async (message: Message) => {
-    const doc = new jsPDF();
+    const docPdf = new jsPDF();
     const margin = 20;
-    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageWidth = docPdf.internal.pageSize.getWidth();
     const contentWidth = pageWidth - (2 * margin);
-    
-    doc.setFontSize(16);
-    doc.text('LexAdmin - Export de Message', margin, 20);
-    doc.setFontSize(10);
-    doc.text(`Date: ${message.timestamp.toLocaleString()}`, margin, 30);
-    doc.text(`Rôle: ${message.role === 'user' ? 'Utilisateur' : 'Assistant LexAdmin'}`, margin, 35);
-    doc.setLineWidth(0.5);
-    doc.line(margin, 40, pageWidth - margin, 40);
-    doc.setFontSize(12);
-    const splitText = doc.splitTextToSize(message.content, contentWidth);
-    doc.text(splitText, margin, 50);
-    doc.save(`lexadmin-message-${message.id}.pdf`);
+    docPdf.setFontSize(16);
+    docPdf.text('LexAdmin - Export de Message', margin, 20);
+    docPdf.setFontSize(10);
+    docPdf.text(`Date: ${message.timestamp.toLocaleString()}`, margin, 30);
+    docPdf.text(`Rôle: ${message.role === 'user' ? 'Utilisateur' : 'Assistant LexAdmin'}`, margin, 35);
+    docPdf.setLineWidth(0.5);
+    docPdf.line(margin, 40, pageWidth - margin, 40);
+    docPdf.setFontSize(12);
+    const splitText = docPdf.splitTextToSize(message.content, contentWidth);
+    docPdf.text(splitText, margin, 50);
+    docPdf.save(`lexadmin-message-${message.id}.pdf`);
+  };
+
+  const exportFAQToPDF = (faq: FAQ) => {
+    const docPdf = new jsPDF();
+    const margin = 20;
+    const pageWidth = docPdf.internal.pageSize.getWidth();
+    const contentWidth = pageWidth - (2 * margin);
+    // En-tête
+    docPdf.setFontSize(10);
+    docPdf.setTextColor(100);
+    docPdf.text('LexAdmin — Base de Connaissances', margin, 15);
+    docPdf.text(faq.category, pageWidth - margin, 15, { align: 'right' });
+    docPdf.setLineWidth(0.3);
+    docPdf.line(margin, 18, pageWidth - margin, 18);
+    // Titre
+    docPdf.setFontSize(16);
+    docPdf.setTextColor(0);
+    const titleLines = docPdf.splitTextToSize(faq.question, contentWidth);
+    docPdf.text(titleLines, margin, 28);
+    const titleH = titleLines.length * 8;
+    // Contenu (texte brut sans Markdown)
+    docPdf.setFontSize(11);
+    docPdf.setTextColor(50);
+    const cleanContent = faq.answer
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/`/g, '')
+      .replace(/---/g, '─────────────────')
+      .replace(/!\[.*?\]\(.*?\)/g, '[image]');
+    const contentLines = docPdf.splitTextToSize(cleanContent, contentWidth);
+    docPdf.text(contentLines, margin, 28 + titleH + 6);
+    // Pied
+    docPdf.setFontSize(8);
+    docPdf.setTextColor(150);
+    docPdf.text(`Exporté depuis LexAdmin`, margin, docPdf.internal.pageSize.getHeight() - 10);
+    docPdf.save(`lexadmin-fiche-${faq.id}.pdf`);
+  };
+
+  const exportJurisprudenceToPDF = (j: Jurisprudence) => {
+    const docPdf = new jsPDF();
+    const margin = 20;
+    const pageWidth = docPdf.internal.pageSize.getWidth();
+    const contentWidth = pageWidth - (2 * margin);
+    // En-tête
+    docPdf.setFontSize(10);
+    docPdf.setTextColor(100);
+    docPdf.text('LexAdmin — Veille Jurisprudentielle', margin, 15);
+    docPdf.text(`Impact : ${j.impact} · ${j.date}`, pageWidth - margin, 15, { align: 'right' });
+    docPdf.setLineWidth(0.3);
+    docPdf.line(margin, 18, pageWidth - margin, 18);
+    // Titre
+    docPdf.setFontSize(15);
+    docPdf.setTextColor(0);
+    const titleLines = docPdf.splitTextToSize(j.title, contentWidth);
+    docPdf.text(titleLines, margin, 28);
+    const titleH = titleLines.length * 7;
+    let y = 28 + titleH + 4;
+    // Tags
+    docPdf.setFontSize(9);
+    docPdf.setTextColor(120);
+    docPdf.text(j.tags.map(t => `#${t}`).join('  '), margin, y);
+    y += 8;
+    docPdf.setLineWidth(0.2);
+    docPdf.line(margin, y, pageWidth - margin, y);
+    y += 6;
+    // Résumé
+    const cleanText = (md: string) => md
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/`/g, '')
+      .replace(/---/g, '─────────────────')
+      .replace(/!\[.*?\]\(.*?\)/g, '[image]');
+    if (j.summary) {
+      docPdf.setFontSize(11);
+      docPdf.setTextColor(30);
+      docPdf.text('Résumé', margin, y);
+      y += 6;
+      docPdf.setFontSize(10);
+      docPdf.setTextColor(60);
+      const summaryLines = docPdf.splitTextToSize(cleanText(j.summary), contentWidth);
+      docPdf.text(summaryLines, margin, y);
+      y += summaryLines.length * 5 + 6;
+    }
+    // Analyse complète
+    if (j.fullAnalysis) {
+      docPdf.setFontSize(11);
+      docPdf.setTextColor(30);
+      docPdf.text('Analyse pédagogique', margin, y);
+      y += 6;
+      docPdf.setFontSize(9);
+      docPdf.setTextColor(60);
+      const analysisLines = docPdf.splitTextToSize(cleanText(j.fullAnalysis), contentWidth);
+      // Gestion multi-pages
+      analysisLines.forEach((line: string) => {
+        if (y > docPdf.internal.pageSize.getHeight() - 20) {
+          docPdf.addPage();
+          y = 20;
+        }
+        docPdf.text(line, margin, y);
+        y += 5;
+      });
+    }
+    // Pied
+    docPdf.setFontSize(8);
+    docPdf.setTextColor(150);
+    const pages = (docPdf as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      docPdf.setPage(i);
+      docPdf.text(`LexAdmin · Page ${i}/${pages}`, pageWidth - margin, docPdf.internal.pageSize.getHeight() - 10, { align: 'right' });
+    }
+    docPdf.save(`lexadmin-jurisprudence-${j.id}.pdf`);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1007,7 +1134,28 @@ function App() {
           <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">LexAdmin</span>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
+        <div className="px-4 pt-4 pb-2">
+          <button
+            onClick={() => setShowGlobalSearch(true)}
+            className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-400 hover:border-emerald-300 hover:bg-emerald-50 transition-all"
+          >
+            <Search size={15} />
+            Recherche globale…
+            <kbd className="ml-auto text-[10px] bg-white border border-gray-200 rounded px-1 py-0.5 text-gray-400">⌘K</kbd>
+          </button>
+        </div>
+
+        <nav className="flex-1 p-4 space-y-1">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={cn(
+              "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
+              activeTab === 'dashboard' ? "bg-emerald-50 text-emerald-700 font-medium shadow-sm" : "text-gray-600 hover:bg-gray-50"
+            )}
+          >
+            <Home size={20} />
+            Tableau de bord
+          </button>
           <button
             onClick={() => setActiveTab('chat')}
             className={cn(
@@ -1090,7 +1238,7 @@ function App() {
               <ChevronRight className={cn("transition-transform duration-300", showSidebar && "rotate-180")} />
             </button>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100 capitalize">
-              {activeTab === 'chat' ? 'Assistant IA Juridique' : activeTab === 'jurisprudence' ? 'Veille Jurisprudentielle' : activeTab === 'codes' ? 'Mes Codes' : activeTab === 'faq' ? 'Base de Connaissances' : 'Messages Favoris'}
+              {activeTab === 'dashboard' ? 'Tableau de bord' : activeTab === 'chat' ? 'Assistant IA Juridique' : activeTab === 'jurisprudence' ? 'Veille Jurisprudentielle' : activeTab === 'codes' ? 'Mes Codes' : activeTab === 'faq' ? 'Base de Connaissances' : 'Messages Favoris'}
             </h2>
           </div>
 
@@ -1123,6 +1271,104 @@ function App() {
         </header>
 
         <div className="flex-1 overflow-hidden relative flex flex-col">
+
+          {/* ── TABLEAU DE BORD ───────────────────────────────────────────────── */}
+          {activeTab === 'dashboard' && (
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="max-w-5xl mx-auto space-y-8">
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    { label: 'Décisions', count: jurisprudence.length, icon: <Gavel size={22} />, color: 'emerald', tab: 'jurisprudence' as const },
+                    { label: 'Fiches', count: faqs.length, icon: <BookOpen size={22} />, color: 'teal', tab: 'faq' as const },
+                    { label: 'Codes', count: codes.length, icon: <Scale size={22} />, color: 'cyan', tab: 'codes' as const },
+                  ].map(s => (
+                    <button
+                      key={s.label}
+                      onClick={() => setActiveTab(s.tab)}
+                      className="bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-md transition-all text-left group"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                          {s.icon}
+                        </div>
+                        <ChevronRight size={16} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />
+                      </div>
+                      <p className="text-3xl font-bold text-gray-900">{s.count}</p>
+                      <p className="text-sm text-gray-500 mt-0.5">{s.label}</p>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Dernières décisions */}
+                {jurisprudence.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest">Dernières décisions</h3>
+                      <button onClick={() => setActiveTab('jurisprudence')} className="text-xs text-emerald-600 font-semibold hover:text-emerald-700">
+                        Voir tout →
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {jurisprudence.slice(0, 3).map(j => (
+                        <div
+                          key={j.id}
+                          className="bg-white border border-gray-100 rounded-xl p-4 hover:shadow-sm transition-all cursor-pointer flex items-start justify-between gap-4"
+                          onClick={() => setSelectedJurisprudenceSummary(j)}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border", IMPACT_COLORS[j.impact])}>
+                                {j.impact}
+                              </span>
+                              <span className="text-xs text-gray-400">{j.date}</span>
+                            </div>
+                            <p className="text-sm font-semibold text-gray-900 truncate">{j.title}</p>
+                          </div>
+                          <ChevronRight size={16} className="text-gray-300 flex-shrink-0 mt-1" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Dernières fiches */}
+                {faqs.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest">Dernières fiches</h3>
+                      <button onClick={() => setActiveTab('faq')} className="text-xs text-emerald-600 font-semibold hover:text-emerald-700">
+                        Voir tout →
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {faqs.slice(0, 3).map(faq => (
+                        <div
+                          key={faq.id}
+                          className="bg-white border border-gray-100 rounded-xl p-4 hover:shadow-sm transition-all cursor-pointer flex items-start justify-between gap-4"
+                          onClick={() => setSelectedFAQ(faq)}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">{faq.category}</span>
+                            <p className="text-sm font-semibold text-gray-900 truncate mt-0.5">{faq.question}</p>
+                          </div>
+                          <ChevronRight size={16} className="text-gray-300 flex-shrink-0 mt-1" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {jurisprudence.length === 0 && faqs.length === 0 && codes.length === 0 && (
+                  <div className="text-center py-20">
+                    <Scale size={48} className="mx-auto text-gray-200 mb-4" />
+                    <p className="text-gray-400 font-medium">Votre espace LexAdmin est vide.</p>
+                    <p className="text-gray-400 text-sm mt-1">Commencez par ajouter une fiche ou une décision.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ── CHAT ─────────────────────────────────────────────────────────── */}
           {activeTab === 'chat' && (
@@ -1809,6 +2055,13 @@ function App() {
                     {isCopying === selectedFAQ.id + '-lightbox' ? <Check size={20} /> : <Copy size={20} />}
                   </button>
                   <button
+                    onClick={() => exportFAQToPDF(selectedFAQ)}
+                    className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                    title="Exporter en PDF"
+                  >
+                    <FileText size={20} />
+                  </button>
+                  <button
                     onClick={() => { openEditFAQ(selectedFAQ); setSelectedFAQ(null); }}
                     className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                     title="Modifier la fiche"
@@ -2198,6 +2451,13 @@ function App() {
                         {isCopying === selectedJurisprudence.id ? <Check size={20} /> : <Copy size={20} />}
                       </button>
                       <button
+                        onClick={() => exportJurisprudenceToPDF(selectedJurisprudence)}
+                        className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                        title="Exporter en PDF"
+                      >
+                        <FileText size={20} />
+                      </button>
+                      <button
                         onClick={() => handleSendToChat(selectedJurisprudence.fullAnalysis!)}
                         className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                         title="Envoyer vers le chat"
@@ -2274,6 +2534,136 @@ function App() {
             </div>
           </div>
         )}
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {/* RECHERCHE GLOBALE                                                    */}
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {showGlobalSearch && (
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-start justify-center pt-24 p-4"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowGlobalSearch(false); }}
+          >
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+              {/* Champ de recherche */}
+              <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+                <Search size={20} className="text-emerald-600 flex-shrink-0" />
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Rechercher dans les fiches, décisions, codes…"
+                  value={globalSearchQuery}
+                  onChange={e => setGlobalSearchQuery(e.target.value)}
+                  className="flex-1 text-base bg-transparent border-none outline-none text-gray-900 placeholder-gray-400"
+                />
+                {globalSearchQuery && (
+                  <button onClick={() => setGlobalSearchQuery('')} className="p-1 text-gray-400 hover:text-gray-600 rounded">
+                    <X size={16} />
+                  </button>
+                )}
+                <button onClick={() => setShowGlobalSearch(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded ml-1">
+                  <kbd className="text-[10px] bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5">Esc</kbd>
+                </button>
+              </div>
+
+              {/* Résultats */}
+              <div className="max-h-[60vh] overflow-y-auto">
+                {globalSearchQuery.trim().length < 2 ? (
+                  <div className="py-12 text-center text-gray-400 text-sm">
+                    Saisissez au moins 2 caractères…
+                  </div>
+                ) : (() => {
+                  const q = globalSearchQuery.toLowerCase();
+                  const matchedJ = jurisprudence.filter(j =>
+                    j.title.toLowerCase().includes(q) ||
+                    j.summary.toLowerCase().includes(q) ||
+                    j.tags.some(t => t.toLowerCase().includes(q))
+                  );
+                  const matchedFaq = faqs.filter(f =>
+                    f.question.toLowerCase().includes(q) ||
+                    f.answer.toLowerCase().includes(q) ||
+                    f.category.toLowerCase().includes(q)
+                  );
+                  const matchedCodes = codes.filter(c =>
+                    c.name.toLowerCase().includes(q) ||
+                    c.knowledgeBase.toLowerCase().includes(q)
+                  );
+                  const total = matchedJ.length + matchedFaq.length + matchedCodes.length;
+
+                  if (total === 0) return (
+                    <div className="py-12 text-center text-gray-400 text-sm">
+                      Aucun résultat pour « {globalSearchQuery} »
+                    </div>
+                  );
+
+                  return (
+                    <div className="p-3 space-y-1">
+                      {matchedJ.length > 0 && (
+                        <>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 pt-2 pb-1">
+                            Veille Jurisprudentielle ({matchedJ.length})
+                          </p>
+                          {matchedJ.map(j => (
+                            <button
+                              key={j.id}
+                              className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 transition-colors flex items-start gap-3 group"
+                              onClick={() => { setSelectedJurisprudenceSummary(j); setShowGlobalSearch(false); setGlobalSearchQuery(''); }}
+                            >
+                              <Gavel size={16} className="text-emerald-500 flex-shrink-0 mt-0.5" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-gray-900 truncate">{j.title}</p>
+                                <p className="text-xs text-gray-400">{j.date} · Impact {j.impact}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      {matchedFaq.length > 0 && (
+                        <>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 pt-3 pb-1">
+                            Base de Connaissances ({matchedFaq.length})
+                          </p>
+                          {matchedFaq.map(f => (
+                            <button
+                              key={f.id}
+                              className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 transition-colors flex items-start gap-3"
+                              onClick={() => { setSelectedFAQ(f); setShowGlobalSearch(false); setGlobalSearchQuery(''); }}
+                            >
+                              <BookOpen size={16} className="text-emerald-500 flex-shrink-0 mt-0.5" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-gray-900 truncate">{f.question}</p>
+                                <p className="text-xs text-gray-400">{f.category}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      {matchedCodes.length > 0 && (
+                        <>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 pt-3 pb-1">
+                            Mes Codes ({matchedCodes.length})
+                          </p>
+                          {matchedCodes.map(c => (
+                            <button
+                              key={c.id}
+                              className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-emerald-50 transition-colors flex items-start gap-3"
+                              onClick={() => { setSelectedCode(c); setShowGlobalSearch(false); setGlobalSearchQuery(''); }}
+                            >
+                              <Scale size={16} className="text-emerald-500 flex-shrink-0 mt-0.5" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      <p className="text-[10px] text-gray-300 text-center pt-3 pb-1">{total} résultat{total > 1 ? 's' : ''}</p>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
     </div>
   );

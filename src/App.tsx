@@ -191,6 +191,25 @@ function MarkdownToolbar({ textareaRef, value, onChange }: MarkdownToolbarProps)
     }, 0);
   };
 
+  const insertLink = () => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const selected = value.substring(start, end);
+    const linkText = selected || 'texte du lien';
+    const before = `[${linkText}](`;
+    const after = ')';
+    const newVal = value.substring(0, start) + before + after + value.substring(end);
+    onChange(newVal);
+    setTimeout(() => {
+      ta.focus();
+      // Positionner le curseur entre les parenthèses pour taper l'URL
+      const urlStart = start + before.length;
+      ta.setSelectionRange(urlStart, urlStart);
+    }, 0);
+  };
+
   const tools = [
     { label: 'G', title: 'Gras', action: () => insert('**', '**'), style: 'font-bold' },
     { label: 'I', title: 'Italique', action: () => insert('*', '*'), style: 'italic' },
@@ -201,6 +220,7 @@ function MarkdownToolbar({ textareaRef, value, onChange }: MarkdownToolbarProps)
     { label: '•', title: 'Liste à puces', action: () => insertLine('- '), style: 'text-base' },
     { label: '1.', title: 'Liste numérotée', action: () => insertLine('1. '), style: 'text-xs font-bold' },
     { label: '`', title: 'Code inline', action: () => insert('`', '`'), style: 'font-mono text-xs' },
+    { label: '🔗', title: 'Lien externe', action: insertLink, style: 'text-xs' },
   ];
 
   return (
@@ -239,6 +259,7 @@ function App() {
   const [jurisprudenceSearch, setJurisprudenceSearch] = useState('');
   const [codesSearch, setCodesSearch] = useState('');
   const [selectedJurisprudence, setSelectedJurisprudence] = useState<Jurisprudence | null>(null);
+  const [selectedJurisprudenceSummary, setSelectedJurisprudenceSummary] = useState<Jurisprudence | null>(null);
   const [selectedCode, setSelectedCode] = useState<LegalCode | null>(null);
   const [selectedFAQ, setSelectedFAQ] = useState<FAQ | null>(null);
   const [editingFAQ, setEditingFAQ] = useState<FAQ | null>(null);
@@ -1226,7 +1247,11 @@ function App() {
                                 {j.date}
                               </span>
                             </div>
-                            <h4 className="text-lg font-bold text-gray-900 group-hover:text-emerald-600 transition-colors">{j.title}</h4>
+                            <h4
+                              className="text-lg font-bold text-gray-900 group-hover:text-emerald-600 transition-colors cursor-pointer"
+                              onClick={() => setSelectedJurisprudenceSummary(j)}
+                              title="Voir le résumé complet"
+                            >{j.title}</h4>
                           </div>
                           <button
                             onClick={() => handleDeleteJurisprudence(j.id)}
@@ -1729,7 +1754,7 @@ function App() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Résumé des faits ou de la solution</label>
+                  <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Résumé des faits</label>
                   <MarkdownToolbar
                     textareaRef={jSummaryRef}
                     value={newJ.summary || ''}
@@ -1737,7 +1762,7 @@ function App() {
                   />
                   <textarea
                     ref={jSummaryRef}
-                    placeholder="Décrivez les faits ou résumez la portée de l'arrêt... (Markdown supporté)"
+                    placeholder="Décrivez les faits et la portée de l'arrêt... (Markdown supporté)"
                     value={newJ.summary}
                     onChange={(e) => setNewJ({ ...newJ, summary: e.target.value })}
                     rows={6}
@@ -1940,6 +1965,81 @@ function App() {
                     <p className="text-center">Ce code ne contient que le lien Légifrance. Utilisez l'icône "Bulle" en haut à droite pour l'interroger directement dans le chat.</p>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Lightbox résumé jurisprudence */}
+        {selectedJurisprudenceSummary && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-gray-100 flex items-start justify-between bg-white sticky top-0 z-10">
+                <div className="flex-1 pr-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className={cn(
+                      "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                      IMPACT_COLORS[selectedJurisprudenceSummary.impact]
+                    )}>
+                      Impact {selectedJurisprudenceSummary.impact}
+                    </span>
+                    <span className="text-xs text-gray-400 font-medium">{selectedJurisprudenceSummary.date}</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">{selectedJurisprudenceSummary.title}</h3>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => copyToClipboard(selectedJurisprudenceSummary.summary, selectedJurisprudenceSummary.id + '-summary')}
+                    className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                    title="Copier le résumé"
+                  >
+                    {isCopying === selectedJurisprudenceSummary.id + '-summary' ? <Check size={20} /> : <Copy size={20} />}
+                  </button>
+                  <button
+                    onClick={() => { openEditJurisprudence(selectedJurisprudenceSummary); setSelectedJurisprudenceSummary(null); }}
+                    className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                    title="Modifier"
+                  >
+                    <Pencil size={20} />
+                  </button>
+                  <button
+                    onClick={() => setSelectedJurisprudenceSummary(null)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors ml-1"
+                  >
+                    <Plus size={24} className="rotate-45 text-gray-400" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8">
+                <div className="prose prose-emerald max-w-none text-gray-700 leading-relaxed markdown-body">
+                  <ReactMarkdown>{selectedJurisprudenceSummary.summary || '*Aucun résumé rédigé.*'}</ReactMarkdown>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+                <div className="flex flex-wrap gap-2">
+                  {selectedJurisprudenceSummary.tags.map(tag => (
+                    <span key={tag} className="px-3 py-1 bg-white text-gray-500 rounded-lg text-xs font-bold border border-gray-200">
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => { setSelectedJurisprudence(selectedJurisprudenceSummary); setSelectedJurisprudenceSummary(null); }}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-all text-sm"
+                  >
+                    Analyse complète
+                    <ChevronRight size={16} />
+                  </button>
+                  <button
+                    onClick={() => setSelectedJurisprudenceSummary(null)}
+                    className="px-4 py-2 bg-white border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 transition-all text-sm"
+                  >
+                    Fermer
+                  </button>
+                </div>
               </div>
             </div>
           </div>

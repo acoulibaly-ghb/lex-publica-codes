@@ -277,6 +277,7 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const faqAnswerRef = useRef<HTMLTextAreaElement>(null);
   const jSummaryRef = useRef<HTMLTextAreaElement>(null);
+  const hasInitiallyCollapsed = useRef(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -284,6 +285,21 @@ function App() {
 
   useEffect(() => {
     scrollToBottom();
+  }, [messages]);
+
+  // Replier automatiquement tous les longs messages au premier chargement
+  useEffect(() => {
+    if (messages.length > 0 && !hasInitiallyCollapsed.current) {
+      hasInitiallyCollapsed.current = true;
+      const idsToCollapse = new Set(
+        messages
+          .filter(m => m.role === 'assistant' && m.content.length > 400)
+          .map(m => m.id)
+      );
+      if (idsToCollapse.size > 0) {
+        setCollapsedMessages(idsToCollapse);
+      }
+    }
   }, [messages]);
 
   useEffect(() => {

@@ -97,6 +97,7 @@ interface Jurisprudence {
   tags: string[];
   link: string;
   fullAnalysis?: string;
+  conclusionsLink?: string;
   createdAt: any;
 }
 
@@ -253,7 +254,8 @@ function App() {
     summary: '',
     impact: 'Moyen',
     tags: [],
-    link: ''
+    link: '',
+    conclusionsLink: ''
   });
   const [newCode, setNewCode] = useState<Partial<LegalCode>>({
     name: '',
@@ -427,6 +429,7 @@ function App() {
       impact: j.impact,
       tags: j.tags,
       link: j.link,
+      conclusionsLink: j.conclusionsLink || '',
     });
     setShowAddJModal(true);
   };
@@ -435,7 +438,7 @@ function App() {
   const closeAddJModal = () => {
     setShowAddJModal(false);
     setEditingJurisprudence(null);
-    setNewJ({ title: '', date: '', summary: '', impact: 'Moyen', tags: [], link: '' });
+    setNewJ({ title: '', date: '', summary: '', impact: 'Moyen', tags: [], link: '', conclusionsLink: '' });
   };
 
   // ─── NOUVEAU : sauvegarder les modifications d'une décision ──────────────
@@ -449,6 +452,7 @@ function App() {
         impact: newJ.impact || 'Moyen',
         tags: newJ.tags || [],
         link: newJ.link || '',
+        conclusionsLink: newJ.conclusionsLink || '',
       });
       if (selectedJurisprudence?.id === editingJurisprudence.id) {
         setSelectedJurisprudence({
@@ -541,6 +545,7 @@ function App() {
         impact: (newJ.impact as any) || 'Moyen',
         tags: newJ.tags || [],
         link: newJ.link || '',
+        conclusionsLink: newJ.conclusionsLink || '',
         createdAt: serverTimestamp()
       };
       await setDoc(jRef, jData);
@@ -991,8 +996,7 @@ function App() {
                   messages.map((message) => {
                     const isCollapsed = collapsedMessages.has(message.id);
                     const isAssistant = message.role === 'assistant';
-                    const PREVIEW_LENGTH = 220;
-                    const isLong = message.content.length > PREVIEW_LENGTH;
+                    const isLong = message.content.length > 400;
 
                     return (
                       <div
@@ -1020,13 +1024,13 @@ function App() {
                               ? "bg-emerald-600 text-white rounded-tr-none"
                               : "bg-white border border-gray-100 text-gray-800 rounded-tl-none"
                           )}>
-                            <div className="markdown-body">
-                              {isAssistant && isCollapsed && isLong ? (
-                                <p className="text-gray-500 italic">
-                                  {message.content.substring(0, PREVIEW_LENGTH)}…
-                                </p>
-                              ) : (
-                                <ReactMarkdown>{message.content}</ReactMarkdown>
+                            <div className={cn(
+                              "markdown-body relative",
+                              isAssistant && isCollapsed && isLong && "max-h-20 overflow-hidden"
+                            )}>
+                              <ReactMarkdown>{message.content}</ReactMarkdown>
+                              {isAssistant && isCollapsed && isLong && (
+                                <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white to-transparent pointer-events-none" />
                               )}
                             </div>
                           </div>
@@ -1263,6 +1267,18 @@ function App() {
                               >
                                 <ExternalLink size={14} />
                                 Légifrance
+                              </a>
+                            )}
+                            {j.conclusionsLink && (
+                              <a
+                                href={j.conclusionsLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-gray-400 hover:text-emerald-600 flex items-center gap-1"
+                                title="Conclusions du rapporteur public"
+                              >
+                                <ExternalLink size={14} />
+                                Concl. rapp. pub.
                               </a>
                             )}
                           </div>
@@ -1748,6 +1764,20 @@ function App() {
                 </div>
 
                 <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">
+                    Lien Conclusions du rapporteur public
+                    <span className="ml-2 text-[10px] font-normal text-gray-400 normal-case">Optionnel — CE ou source personnelle</span>
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    value={newJ.conclusionsLink}
+                    onChange={(e) => setNewJ({ ...newJ, conclusionsLink: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Mots-clés (séparés par des virgules)</label>
                   <input
                     type="text"
@@ -1975,17 +2005,30 @@ function App() {
                     </span>
                   ))}
                 </div>
-                {selectedJurisprudence.link && (
-                  <a
-                    href={selectedJurisprudence.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition-all text-sm font-bold"
-                  >
-                    <ExternalLink size={16} />
-                    Voir sur Légifrance
-                  </a>
-                )}
+                <div className="flex items-center gap-3">
+                  {selectedJurisprudence.conclusionsLink && (
+                    <a
+                      href={selectedJurisprudence.conclusionsLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition-all text-sm font-bold"
+                    >
+                      <ExternalLink size={16} />
+                      Conclusions rapp. pub.
+                    </a>
+                  )}
+                  {selectedJurisprudence.link && (
+                    <a
+                      href={selectedJurisprudence.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition-all text-sm font-bold"
+                    >
+                      <ExternalLink size={16} />
+                      Voir sur Légifrance
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           </div>

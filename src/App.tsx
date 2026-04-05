@@ -156,6 +156,117 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
+// ─── Aide Markdown ──────────────────────────────────────────────────────────
+const MARKDOWN_HELP_ITEMS = [
+  {
+    section: 'Mise en forme',
+    items: [
+      { syntax: '**texte**', result: 'Gras', example: '**caractère définitif**' },
+      { syntax: '*texte*', result: 'Italique', example: '*contra legem*' },
+      { syntax: '`texte`', result: 'Code / terme technique', example: '`recours pour excès de pouvoir`' },
+      { syntax: '---', result: 'Séparateur horizontal', example: '---' },
+    ]
+  },
+  {
+    section: 'Titres',
+    items: [
+      { syntax: '# Titre', result: 'Titre niveau 1', example: '# I. Conditions de recevabilité' },
+      { syntax: '## Titre', result: 'Titre niveau 2', example: '## A. Conditions de fond' },
+      { syntax: '### Titre', result: 'Titre niveau 3', example: '### 1. L\'intérêt à agir' },
+    ]
+  },
+  {
+    section: 'Listes',
+    items: [
+      { syntax: '- élément', result: 'Liste à puces', example: '- Exception d\'illégalité\n- Demande d\'abrogation' },
+      { syntax: '1. élément', result: 'Liste numérotée', example: '1. Recevabilité\n2. Fond' },
+    ]
+  },
+  {
+    section: 'Liens',
+    items: [
+      { syntax: '[texte](url)', result: 'Lien externe', example: '[Légifrance](https://www.legifrance.gouv.fr)' },
+    ]
+  },
+  {
+    section: 'Repères visuels colorés',
+    items: [
+      { syntax: '![■](https://placehold.co/15x15/f03c15/f03c15.png)', result: '🟥 Rouge — Danger / Attention / Jurisprudence hostile', example: '' },
+      { syntax: '![■](https://placehold.co/15x15/c5f015/c5f015.png)', result: '🟩 Vert — Favorable / Solution retenue', example: '' },
+      { syntax: '![■](https://placehold.co/15x15/1589F0/1589F0.png)', result: '🟦 Bleu — Référence / Doctrine / Renvoi', example: '' },
+      { syntax: '![■](https://placehold.co/15x15/FFA500/FFA500.png)', result: '🟧 Orange — Nuance / Évolution / Revirement', example: '' },
+      { syntax: '![■](https://placehold.co/15x15/9B59B6/9B59B6.png)', result: '🟪 Violet — Droit européen / Droit international', example: '' },
+    ]
+  },
+];
+
+function MarkdownHelpModal({ onClose }: { onClose: () => void }) {
+  const [copiedSyntax, setCopiedSyntax] = useState<string | null>(null);
+
+  const copySyntax = (syntax: string) => {
+    navigator.clipboard.writeText(syntax);
+    setCopiedSyntax(syntax);
+    setTimeout(() => setCopiedSyntax(null), 1500);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col">
+        <div className="p-5 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">📖</span>
+            <h3 className="text-lg font-bold text-gray-900">Guide Markdown</h3>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <Plus size={22} className="rotate-45 text-gray-400" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {MARKDOWN_HELP_ITEMS.map(group => (
+            <div key={group.section}>
+              <h4 className="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <div className="w-1 h-3 bg-emerald-600 rounded-full" />
+                {group.section}
+              </h4>
+              <div className="space-y-2">
+                {group.items.map(item => (
+                  <div
+                    key={item.syntax}
+                    className="flex items-start justify-between gap-4 p-3 bg-gray-50 rounded-xl hover:bg-emerald-50 transition-colors group cursor-pointer"
+                    onClick={() => copySyntax(item.syntax)}
+                    title="Cliquer pour copier la syntaxe"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <code className="text-xs font-mono text-emerald-700 bg-emerald-50 group-hover:bg-white px-1.5 py-0.5 rounded transition-colors break-all">
+                        {item.syntax}
+                      </code>
+                      <p className="text-sm text-gray-600 mt-1">{item.result}</p>
+                      {item.example && (
+                        <p className="text-[11px] text-gray-400 mt-0.5 font-mono">{item.example}</p>
+                      )}
+                    </div>
+                    <div className="flex-shrink-0 pt-0.5">
+                      {copiedSyntax === item.syntax
+                        ? <Check size={14} className="text-emerald-600" />
+                        : <Copy size={14} className="text-gray-300 group-hover:text-emerald-400 transition-colors" />
+                      }
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="p-4 border-t border-gray-100 bg-gray-50 text-center">
+          <p className="text-[11px] text-gray-400">Cliquez sur une ligne pour copier la syntaxe · Collez-la dans votre fiche</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Barre d'outils Markdown ────────────────────────────────────────────────
 interface MarkdownToolbarProps {
   textareaRef: React.RefObject<HTMLTextAreaElement>;
@@ -164,6 +275,7 @@ interface MarkdownToolbarProps {
 }
 
 function MarkdownToolbar({ textareaRef, value, onChange }: MarkdownToolbarProps) {
+  const [showHelp, setShowHelp] = useState(false);
   const insert = (before: string, after: string = '') => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -224,23 +336,36 @@ function MarkdownToolbar({ textareaRef, value, onChange }: MarkdownToolbarProps)
   ];
 
   return (
-    <div className="flex flex-wrap gap-1 px-2 py-1.5 bg-gray-100 border border-b-0 border-gray-200 rounded-t-xl">
-      {tools.map((t) => (
-        <button
-          key={t.title}
-          type="button"
-          title={t.title}
-          onClick={t.action}
-          className={cn(
-            "px-2 py-1 rounded text-gray-600 hover:bg-white hover:text-emerald-700 hover:shadow-sm transition-all text-sm min-w-[28px]",
-            t.style
-          )}
-        >
-          {t.label}
-        </button>
-      ))}
-      <span className="ml-auto text-[10px] text-gray-400 self-center pr-1">Markdown</span>
-    </div>
+    <>
+      {showHelp && <MarkdownHelpModal onClose={() => setShowHelp(false)} />}
+      <div className="flex flex-wrap gap-1 px-2 py-1.5 bg-gray-100 border border-b-0 border-gray-200 rounded-t-xl">
+        {tools.map((t) => (
+          <button
+            key={t.title}
+            type="button"
+            title={t.title}
+            onClick={t.action}
+            className={cn(
+              "px-2 py-1 rounded text-gray-600 hover:bg-white hover:text-emerald-700 hover:shadow-sm transition-all text-sm min-w-[28px]",
+              t.style
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+        <div className="flex items-center ml-auto gap-2">
+          <span className="text-[10px] text-gray-400 self-center">Markdown</span>
+          <button
+            type="button"
+            title="Guide Markdown"
+            onClick={() => setShowHelp(true)}
+            className="w-6 h-6 rounded-full bg-yellow-400 hover:bg-yellow-500 text-white font-bold text-xs flex items-center justify-center transition-colors shadow-sm"
+          >
+            ?
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 

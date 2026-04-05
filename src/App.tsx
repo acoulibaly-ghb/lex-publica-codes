@@ -1729,7 +1729,7 @@ function App() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Résumé des faits</label>
+                  <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Résumé des faits ou de la solution</label>
                   <MarkdownToolbar
                     textareaRef={jSummaryRef}
                     value={newJ.summary || ''}
@@ -1737,7 +1737,7 @@ function App() {
                   />
                   <textarea
                     ref={jSummaryRef}
-                    placeholder="Décrivez les faits et la portée de l'arrêt... (Markdown supporté)"
+                    placeholder="Décrivez les faits ou résumez la portée de l'arrêt... (Markdown supporté)"
                     value={newJ.summary}
                     onChange={(e) => setNewJ({ ...newJ, summary: e.target.value })}
                     rows={6}

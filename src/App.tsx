@@ -467,7 +467,7 @@ function App() {
     }
   };
 
-
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !user || isLoading) return;
 
